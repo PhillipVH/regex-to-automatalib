@@ -2,6 +2,7 @@ import de.learnlib.algorithms.lstar.dfa.ClassicLStarDFA;
 import de.learnlib.api.oracle.EquivalenceOracle.DFAEquivalenceOracle;
 import de.learnlib.api.oracle.MembershipOracle;
 import de.learnlib.api.query.DefaultQuery;
+import de.learnlib.oracle.equivalence.DFARandomWordsEQOracle;
 import de.learnlib.oracle.equivalence.DFASimulatorEQOracle;
 import de.learnlib.oracle.membership.SimulatorOracle;
 import dk.brics.automaton.RegExp;
@@ -14,7 +15,8 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
+import java.time.Duration;
+import java.util.concurrent.*;
 
 
 public class Main {
@@ -49,7 +51,7 @@ public class Main {
         MembershipOracle.DFAMembershipOracle<Character> memOracle = new SimulatorOracle.DFASimulatorOracle<>(dfa);
 
         // 3. Select the equivalence oracle strategy
-        /* DFARandomWordsEQOracle<Character> eqOracle = new DFARandomWordsEQOracle<>(memOracle, 0, 10, 100); */
+//        DFARandomWordsEQOracle<Character> eqOracle = new DFARandomWordsEQOracle<>(memOracle, 0, 10, 100);
         DFAEquivalenceOracle<Character> eqOracle = perfectOracle(dfa);
 
         // 4. Create the Learner and begin the learning cycle
@@ -78,8 +80,6 @@ public class Main {
 
         // Append the learning result
         // Check if the hypothesis is equivalent
-
-
         DefaultQuery<?, ?> perfectCounterExample = eqOracle.findCounterExample(learner.getHypothesisModel(), unicode);
 
         csv.line(index + "," + delta + "," + (perfectCounterExample != null ? perfectCounterExample.toString() : "true") + "," + regex);
@@ -93,39 +93,56 @@ public class Main {
         Path path = Paths.get(benchmarks);
         BufferedReader reader = Files.newBufferedReader(path);
 
-        int bad = 0, good = 0;
+        int bad = 0, good = 0, timeout = 0;
         int n = 0;
 
         if (1 == 1) {
             printDiagnostics();
-            return;
+//            return;
         }
 
         // Select the alphabet
         Alphabet<Character> alphabet = unicode;
+
+        // Create the executor for timeout purposes
+        ExecutorService executor = Executors.newSingleThreadExecutor();
 
         // Learn each regex in sequence
         csv.line("# Alphabet = Unicode");
         csv.line("Index,Time(ms),Equivalent,Target");
         int i = 0;
         while (reader.ready()) {
+            final int index = i;
             String targetRegex = reader.readLine().trim();
 
             System.out.println(n++ + " Creating Brics Automaton for " + targetRegex);
+
+            // Learn the regex
+            Future<DFA<?, ?>> handler = executor.submit((() -> {
+                return learnRegex(targetRegex, alphabet, index);
+            }));
+
+            i++;
+
             try {
-
-                // Learn the regex
-                DFA<?, Character> hypothesis = learnRegex(targetRegex, alphabet, i);
-
+                handler.get(5, TimeUnit.MINUTES);
                 good += 1;
-                i++;
+            } catch (TimeoutException e) {
+                handler.cancel(true);
+                e.printStackTrace();
+                timeout += 1;
             } catch (Exception e) {
                 e.printStackTrace();
                 bad += 1;
             }
         }
 
+        // Stop the executor
+        executor.shutdownNow();
+
+        // Report statistics and halt
         System.out.println(good);
         System.out.println(bad);
+        System.out.println(timeout);
     }
 }
