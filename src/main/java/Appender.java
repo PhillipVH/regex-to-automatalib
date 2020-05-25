@@ -41,4 +41,15 @@ public class Appender {
 
         return this;
     }
+
+    public Appender write(String input) {
+        try {
+            writer.append(input);
+            writer.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return this;
+    }
 }

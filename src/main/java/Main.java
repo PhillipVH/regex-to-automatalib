@@ -2,6 +2,7 @@ import de.learnlib.algorithms.lstar.dfa.ClassicLStarDFA;
 import de.learnlib.api.oracle.EquivalenceOracle.DFAEquivalenceOracle;
 import de.learnlib.api.oracle.MembershipOracle;
 import de.learnlib.api.query.DefaultQuery;
+import de.learnlib.oracle.equivalence.DFACompleteExplorationEQOracle;
 import de.learnlib.oracle.equivalence.DFARandomWordsEQOracle;
 import de.learnlib.oracle.equivalence.DFASimulatorEQOracle;
 import de.learnlib.oracle.membership.SimulatorOracle;
@@ -43,7 +44,6 @@ public class Main {
     }
 
     public static DFA<?, Character> learnRegex(String regex, Alphabet<Character> alphabet, int index) {
-
         // 1. Convert the regex into a LearnLib-compatible DFA
         BricsDFA dfa = regexToDFA(regex);
 
@@ -53,6 +53,8 @@ public class Main {
         // 3. Select the equivalence oracle strategy
 //        DFARandomWordsEQOracle<Character> eqOracle = new DFARandomWordsEQOracle<>(memOracle, 0, 10, 100);
         DFAEquivalenceOracle<Character> eqOracle = perfectOracle(dfa);
+        DFAEquivalenceOracle<Character> perfectEqOracle = perfectOracle(dfa);
+//        DFACompleteExplorationEQOracle<Character> eqOracle = new DFACompleteExplorationEQOracle<>(memOracle, 1);
 
         // 4. Create the Learner and begin the learning cycle
         ClassicLStarDFA<Character> learner = new ClassicLStarDFA<>(alphabet, memOracle);
@@ -80,9 +82,12 @@ public class Main {
 
         // Append the learning result
         // Check if the hypothesis is equivalent
-        DefaultQuery<?, ?> perfectCounterExample = eqOracle.findCounterExample(learner.getHypothesisModel(), unicode);
+        DefaultQuery<?, ?> perfectCounterExample = perfectEqOracle.findCounterExample(learner.getHypothesisModel(), unicode);
 
-        csv.line(index + "," + delta + "," + (perfectCounterExample != null ? perfectCounterExample.toString() : "true") + "," + regex);
+        boolean equivalent = perfectCounterExample == null;
+        int counterExampleLength = perfectCounterExample != null ? perfectCounterExample.getSuffix().length() : 0;
+
+        csv.write(delta + "," + (equivalent ? "true" : "false") + "," + counterExampleLength + "," + regex);
 
         return learner.getHypothesisModel();
     }
@@ -109,13 +114,15 @@ public class Main {
 
         // Learn each regex in sequence
         csv.line("# Alphabet = Unicode");
-        csv.line("Index,Time(ms),Equivalent,Target");
+        csv.line("Index,Time(ms),Equivalent,CE-Length,Target");
         int i = 0;
         while (reader.ready()) {
             final int index = i;
             String targetRegex = reader.readLine().trim();
 
             System.out.println(n++ + " Creating Brics Automaton for " + targetRegex);
+
+            csv.write(index + ",");
 
             // Learn the regex
             Future<DFA<?, ?>> handler = executor.submit((() -> {
@@ -135,6 +142,8 @@ public class Main {
                 e.printStackTrace();
                 bad += 1;
             }
+
+            csv.write("," + targetRegex + "\n");
         }
 
         // Stop the executor
