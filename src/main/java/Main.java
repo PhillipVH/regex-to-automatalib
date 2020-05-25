@@ -105,7 +105,7 @@ public class Main {
         Alphabet<Character> alphabet = unicode;
 
         // Learn each regex in sequence
-        csv.line("# Alphabet = Printable ASCII");
+        csv.line("# Alphabet = Unicode");
         csv.line("Index,Time(ms),Equivalent,Target");
         int i = 0;
         while (reader.ready()) {
