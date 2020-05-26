@@ -5,6 +5,7 @@ import de.learnlib.api.query.DefaultQuery;
 import de.learnlib.oracle.equivalence.DFACompleteExplorationEQOracle;
 import de.learnlib.oracle.equivalence.DFARandomWordsEQOracle;
 import de.learnlib.oracle.equivalence.DFASimulatorEQOracle;
+import de.learnlib.oracle.equivalence.DFAWMethodEQOracle;
 import de.learnlib.oracle.membership.SimulatorOracle;
 import dk.brics.automaton.RegExp;
 import net.automatalib.automata.fsa.DFA;
@@ -55,7 +56,8 @@ public class Main {
 //        DFAEquivalenceOracle<Character> eqOracle = perfectOracle(dfa);
         DFAEquivalenceOracle<Character> perfectEqOracle = perfectOracle(dfa);
 //        DFACompleteExplorationEQOracle<Character> eqOracle = new DFACompleteExplorationEQOracle<>(memOracle, 30);
-        DFARandomWordsEQOracle eqOracle = new DFARandomWordsEQOracle(memOracle, 0, 30, 100000);
+//        DFARandomWordsEQOracle eqOracle = new DFARandomWordsEQOracle(memOracle, 0, 30, 100000);
+        DFAWMethodEQOracle eqOracle = new DFAWMethodEQOracle(memOracle, 0, 30, 100000);
 
         // 4. Create the Learner and begin the learning cycle
         ClassicLStarDFA<Character> learner = new ClassicLStarDFA<>(alphabet, memOracle);
