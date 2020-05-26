@@ -52,9 +52,10 @@ public class Main {
 
         // 3. Select the equivalence oracle strategy
 //        DFARandomWordsEQOracle<Character> eqOracle = new DFARandomWordsEQOracle<>(memOracle, 0, 10, 100);
-        DFAEquivalenceOracle<Character> eqOracle = perfectOracle(dfa);
+//        DFAEquivalenceOracle<Character> eqOracle = perfectOracle(dfa);
         DFAEquivalenceOracle<Character> perfectEqOracle = perfectOracle(dfa);
-//        DFACompleteExplorationEQOracle<Character> eqOracle = new DFACompleteExplorationEQOracle<>(memOracle, 1);
+//        DFACompleteExplorationEQOracle<Character> eqOracle = new DFACompleteExplorationEQOracle<>(memOracle, 30);
+        DFARandomWordsEQOracle eqOracle = new DFARandomWordsEQOracle(memOracle, 0, 30, 100000);
 
         // 4. Create the Learner and begin the learning cycle
         ClassicLStarDFA<Character> learner = new ClassicLStarDFA<>(alphabet, memOracle);
@@ -133,12 +134,15 @@ public class Main {
 
             try {
                 handler.get(5, TimeUnit.MINUTES);
+
                 good += 1;
             } catch (TimeoutException e) {
                 handler.cancel(true);
+                csv.write(":timeout,false,");
                 e.printStackTrace();
                 timeout += 1;
             } catch (Exception e) {
+                csv.write(":error,false,");
                 e.printStackTrace();
                 bad += 1;
             }
