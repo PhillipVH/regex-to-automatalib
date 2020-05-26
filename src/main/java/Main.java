@@ -87,7 +87,7 @@ public class Main {
         boolean equivalent = perfectCounterExample == null;
         int counterExampleLength = perfectCounterExample != null ? perfectCounterExample.getSuffix().length() : 0;
 
-        csv.write(delta + "," + (equivalent ? "true" : "false") + "," + counterExampleLength + "," + regex);
+        csv.write(delta + "," + (equivalent ? "true" : "false") + "," + counterExampleLength);
 
         return learner.getHypothesisModel();
     }
