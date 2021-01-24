@@ -2,10 +2,8 @@ import de.learnlib.algorithms.lstar.dfa.ClassicLStarDFA;
 import de.learnlib.api.oracle.EquivalenceOracle.DFAEquivalenceOracle;
 import de.learnlib.api.oracle.MembershipOracle;
 import de.learnlib.api.query.DefaultQuery;
-import de.learnlib.oracle.equivalence.DFACompleteExplorationEQOracle;
-import de.learnlib.oracle.equivalence.DFARandomWordsEQOracle;
-import de.learnlib.oracle.equivalence.DFASimulatorEQOracle;
-import de.learnlib.oracle.equivalence.DFAWMethodEQOracle;
+import de.learnlib.filter.statistic.oracle.DFACounterOracle;
+import de.learnlib.oracle.equivalence.*;
 import de.learnlib.oracle.membership.SimulatorOracle;
 import dk.brics.automaton.RegExp;
 import net.automatalib.automata.fsa.DFA;
@@ -25,6 +23,10 @@ public class Main {
 
     static Alphabet<Character> printableAscii = Alphabets.characters('\u0020', '\u007A');
     static Alphabet<Character> unicode = Alphabets.characters('\u0000', '\uFFFE');
+
+
+
+    static Alphabet<Character> sigma = printableAscii;
 
     static Appender csv = Appender.FileAppender("out.csv");
 
@@ -47,17 +49,20 @@ public class Main {
     public static DFA<?, Character> learnRegex(String regex, Alphabet<Character> alphabet, int index) {
         // 1. Convert the regex into a LearnLib-compatible DFA
         BricsDFA dfa = regexToDFA(regex);
+        System.out.println("Alphabet: " + sigma.toString());
+        System.out.println("Size of alphabet: " +  sigma.size());
 
         // 2. Create the membership oracle
-        MembershipOracle.DFAMembershipOracle<Character> memOracle = new SimulatorOracle.DFASimulatorOracle<>(dfa);
+        MembershipOracle.DFAMembershipOracle<Character> memOracleRaw = new SimulatorOracle.DFASimulatorOracle<>(dfa);
+        DFACounterOracle<Character> memOracle = new DFACounterOracle<>(memOracleRaw, "poes");
 
         // 3. Select the equivalence oracle strategy
 //        DFARandomWordsEQOracle<Character> eqOracle = new DFARandomWordsEQOracle<>(memOracle, 0, 10, 100);
-//        DFAEquivalenceOracle<Character> eqOracle = perfectOracle(dfa);
+        DFAEquivalenceOracle<Character> eqOracle = perfectOracle(dfa);
         DFAEquivalenceOracle<Character> perfectEqOracle = perfectOracle(dfa);
 //        DFACompleteExplorationEQOracle<Character> eqOracle = new DFACompleteExplorationEQOracle<>(memOracle, 30);
-//        DFARandomWordsEQOracle eqOracle = new DFARandomWordsEQOracle(memOracle, 0, 30, 100000);
-        DFAWMethodEQOracle eqOracle = new DFAWMethodEQOracle(memOracle, 0, 30, 100000);
+//        DFARandomWordsEQOracle<Character> eqOracle = new DFARandomWordsEQOracle<>(memOracle, 0,/**/ 30, 100000);
+//        DFARandomWMethodEQOracle<Character> eqOracle = new DFARandomWMethodEQOracle<>(memOracle, 2, 4);
 
         // 4. Create the Learner and begin the learning cycle
         ClassicLStarDFA<Character> learner = new ClassicLStarDFA<>(alphabet, memOracle);
@@ -65,18 +70,20 @@ public class Main {
         DefaultQuery<Character, Boolean> counterexample = null;
 
         long start = System.currentTimeMillis();
+        int eqQueries = 0;
 
         do {
             if (counterexample == null) {
                 learner.startLearning();
             } else {
-                System.out.println("refining with " + counterexample.toString());
+//                System.out.println("refining with " + counterexample.toString());
                 boolean refined = learner.refineHypothesis(counterexample);
                 if (!refined) {
                     System.out.println("No refinement effected by counterexample!");
                 }
             }
 
+            eqQueries++;
             counterexample = eqOracle.findCounterExample(learner.getHypothesisModel(), alphabet);
 
         } while (counterexample != null);
@@ -85,12 +92,25 @@ public class Main {
 
         // Append the learning result
         // Check if the hypothesis is equivalent
-        DefaultQuery<?, ?> perfectCounterExample = perfectEqOracle.findCounterExample(learner.getHypothesisModel(), unicode);
+        DefaultQuery<Character, ?> perfectCounterExample = perfectEqOracle.findCounterExample(learner.getHypothesisModel(), sigma);
 
         boolean equivalent = perfectCounterExample == null;
         int counterExampleLength = perfectCounterExample != null ? perfectCounterExample.getSuffix().length() : 0;
 
-        csv.write(delta + "," + (equivalent ? "true" : "false") + "," + counterExampleLength);
+        csv.write(delta + "," + eqQueries + "," + memOracle.getCount() + ","  + (equivalent ? "true" : "false") + "," + counterExampleLength);
+
+        System.out.println("Conjecture State # : " + learner.getHypothesisModel().getStates().size());
+        System.out.println("Oracle State # : " + dfa.getStates().size());
+
+//        dfa.forEach(s -> {
+//            if (s.isAccept()) {
+//                System.out.println(s);
+//            }
+//        });
+        System.out.println("Equivalent? : " + equivalent);
+        System.out.println("Membership : " + memOracle.getCount());
+        System.out.println("Equivalence : " + eqQueries);
+        System.out.println();
 
         return learner.getHypothesisModel();
     }
@@ -104,20 +124,18 @@ public class Main {
         int bad = 0, good = 0, timeout = 0;
         int n = 0;
 
-        if (1 == 1) {
-            printDiagnostics();
+        printDiagnostics();
 //            return;
-        }
 
         // Select the alphabet
-        Alphabet<Character> alphabet = unicode;
+        Alphabet<Character> alphabet = sigma;
 
         // Create the executor for timeout purposes
         ExecutorService executor = Executors.newSingleThreadExecutor();
 
         // Learn each regex in sequence
-        csv.line("# Alphabet = Unicode");
-        csv.line("Index,Time(ms),Equivalent,CE-Length,Target");
+//        csv.line("# Alphabet = Unicode");
+        csv.line("Index,Time(ms),EqQueries,MemQueries,Equivalent,CE-Length,Target");
         int i = 0;
         while (reader.ready()) {
             final int index = i;
